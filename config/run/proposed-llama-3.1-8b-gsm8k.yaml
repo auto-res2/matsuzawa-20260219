@@ -1,0 +1,45 @@
+# Run config for proposed method: IGV-CoT
+run_id: proposed-llama-3.1-8b-gsm8k
+
+method:
+  name: IGV-CoT
+  type: proposed
+  description: "Invariance-Grounded Verification CoT with metamorphic checks"
+  prompt_template: |
+    You will solve a math word problem robustly.
+    Follow this fixed protocol and keep the solution concise.
+    
+    (1) Solve-Trace: solve ORIGINAL with brief step-by-step reasoning.
+    (2) Constraint Ledger: list variables and the exact equations/constraints implied by the text.
+    (3) Metamorphic Checks: you will be given two semantics-preserving variants (V1, V2). Using the SAME ledger, compute the answer for ORIGINAL, V1, and V2 and report whether they MATCH.
+    (4) If any mismatch or ledger violation occurs, write REVISION: and fix only the earliest incorrect step, then recompute and re-check.
+    (5) Output exactly: FINAL: <number>
+    
+    ORIGINAL: {q}
+    
+    V1 (reordered): {v1}
+    
+    V2 (irrelevant detail added): {v2}
+  single_call: true  # IGV-CoT uses single call with all 3 variants
+
+model:
+  name: Llama-3.1-8B-Instruct
+  provider: openai  # OpenAI-compatible API (vLLM)
+  base_url: null  # Will use OPENAI_BASE_URL env var
+  api_key_env: OPENAI_API_KEY
+  temperature: 0.0
+  max_tokens: 800
+
+dataset:
+  name: GSM8K
+  split: test
+  n_samples: 200  # Full run uses 200
+  cache_dir: .cache
+
+inference:
+  batch_size: 1
+  perturbations:
+    - type: sentence_shuffle
+      seed_offset: 0
+    - type: add_irrelevant
+      text: " Note: the sky is blue."
