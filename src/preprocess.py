@@ -170,6 +170,48 @@ def normalize_number(num_str: str) -> str:
         return None
 
 
+# [VALIDATOR FIX - Attempt 2]
+# [PROBLEM]: Parser was extracting intermediate numbers instead of actual V1/V2 answers
+# [CAUSE]: Regex "V1[:\s]+.*?(-?\d+\.?\d*)" matched first number after "V1", which could be
+#          from ledger calculations like "16 - 7 = 9", capturing "16" instead of answer "9".
+# [FIX]: Update parser to look for explicit "V1 ANSWER: <number>" pattern that matches
+#        the new prompt format. This ensures we extract the actual answer value.
+#
+# [OLD CODE]:
+# def parse_igv_cot_output(text: str) -> Dict[str, str]:
+#     """
+#     Parse IGV-CoT output to extract answers for ORIGINAL, V1, V2.
+#     
+#     Args:
+#         text: Full model output
+#         
+#     Returns:
+#         Dict with 'original', 'v1', 'v2' keys containing extracted numbers
+#     """
+#     results = {}
+#     
+#     # The final FINAL: line is the adjudicated answer for ORIGINAL
+#     results["original"] = extract_final_number(text)
+#     
+#     # Try to extract V1 and V2 answers from metamorphic checks section
+#     # Look for patterns like "V1: <number>" or "Answer for V1: <number>"
+#     v1_match = re.search(r"V1[:\s]+.*?(-?\d+\.?\d*)", text, re.IGNORECASE)
+#     if v1_match:
+#         results["v1"] = v1_match.group(1)
+#     else:
+#         # Fall back: assume same as original if not explicitly different
+#         results["v1"] = results["original"]
+#     
+#     v2_match = re.search(r"V2[:\s]+.*?(-?\d+\.?\d*)", text, re.IGNORECASE)
+#     if v2_match:
+#         results["v2"] = v2_match.group(1)
+#     else:
+#         # Fall back: assume same as original if not explicitly different
+#         results["v2"] = results["original"]
+#     
+#     return results
+#
+# [NEW CODE]:
 def parse_igv_cot_output(text: str) -> Dict[str, str]:
     """
     Parse IGV-CoT output to extract answers for ORIGINAL, V1, V2.
@@ -182,19 +224,24 @@ def parse_igv_cot_output(text: str) -> Dict[str, str]:
     """
     results = {}
     
-    # The final FINAL: line is the adjudicated answer for ORIGINAL
-    results["original"] = extract_final_number(text)
+    # Look for explicit "ORIGINAL ANSWER: <number>" pattern first
+    orig_match = re.search(r"ORIGINAL\s+ANSWER:\s*\$?\s*(-?\d+\.?\d*)", text, re.IGNORECASE)
+    if orig_match:
+        results["original"] = orig_match.group(1)
+    else:
+        # Fall back to FINAL: line
+        results["original"] = extract_final_number(text)
     
-    # Try to extract V1 and V2 answers from metamorphic checks section
-    # Look for patterns like "V1: <number>" or "Answer for V1: <number>"
-    v1_match = re.search(r"V1[:\s]+.*?(-?\d+\.?\d*)", text, re.IGNORECASE)
+    # Look for explicit "V1 ANSWER: <number>" pattern
+    v1_match = re.search(r"V1\s+ANSWER:\s*\$?\s*(-?\d+\.?\d*)", text, re.IGNORECASE)
     if v1_match:
         results["v1"] = v1_match.group(1)
     else:
         # Fall back: assume same as original if not explicitly different
         results["v1"] = results["original"]
     
-    v2_match = re.search(r"V2[:\s]+.*?(-?\d+\.?\d*)", text, re.IGNORECASE)
+    # Look for explicit "V2 ANSWER: <number>" pattern
+    v2_match = re.search(r"V2\s+ANSWER:\s*\$?\s*(-?\d+\.?\d*)", text, re.IGNORECASE)
     if v2_match:
         results["v2"] = v2_match.group(1)
     else:

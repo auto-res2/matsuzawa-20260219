@@ -1,6 +1,36 @@
 # Run config for proposed method: IGV-CoT
 run_id: proposed-llama-3.1-8b-gsm8k
 
+# [VALIDATOR FIX - Attempt 2]
+# [PROBLEM]: Parser extracting wrong numbers from V1/V2 sections
+# [CAUSE]: Prompt asks model to say "MATCH" but doesn't require explicit V1/V2 answers.
+#          Parser regex finds first number after "V1:" which is often an intermediate value.
+# [FIX]: Rewrite prompt to require explicit format "V1 ANSWER: <number>" and "V2 ANSWER: <number>"
+#        so parser can unambiguously extract the variant answers.
+#
+# [OLD CODE]:
+# method:
+#   name: IGV-CoT
+#   type: proposed
+#   description: "Invariance-Grounded Verification CoT with metamorphic checks"
+#   prompt_template: |
+#     You will solve a math word problem robustly.
+#     Follow this fixed protocol and keep the solution concise.
+#     
+#     (1) Solve-Trace: solve ORIGINAL with brief step-by-step reasoning.
+#     (2) Constraint Ledger: list variables and the exact equations/constraints implied by the text.
+#     (3) Metamorphic Checks: you will be given two semantics-preserving variants (V1, V2). Using the SAME ledger, compute the answer for ORIGINAL, V1, and V2 and report whether they MATCH.
+#     (4) If any mismatch or ledger violation occurs, write REVISION: and fix only the earliest incorrect step, then recompute and re-check.
+#     (5) Output exactly: FINAL: <number>
+#     
+#     ORIGINAL: {q}
+#     
+#     V1 (reordered): {v1}
+#     
+#     V2 (irrelevant detail added): {v2}
+#   single_call: true  # IGV-CoT uses single call with all 3 variants
+#
+# [NEW CODE]:
 method:
   name: IGV-CoT
   type: proposed
@@ -10,10 +40,14 @@ method:
     Follow this fixed protocol and keep the solution concise.
     
     (1) Solve-Trace: solve ORIGINAL with brief step-by-step reasoning.
-    (2) Constraint Ledger: list variables and the exact equations/constraints implied by the text.
-    (3) Metamorphic Checks: you will be given two semantics-preserving variants (V1, V2). Using the SAME ledger, compute the answer for ORIGINAL, V1, and V2 and report whether they MATCH.
-    (4) If any mismatch or ledger violation occurs, write REVISION: and fix only the earliest incorrect step, then recompute and re-check.
-    (5) Output exactly: FINAL: <number>
+    (2) Constraint Ledger: list variables and the exact equations/constraints implied by the text (as simple equations).
+    (3) Metamorphic Checks: you will be given two semantics-preserving variants (V1, V2). Apply the SAME ledger to each variant and compute its answer. Output in this EXACT format:
+        ORIGINAL ANSWER: <number>
+        V1 ANSWER: <number>
+        V2 ANSWER: <number>
+        CONSISTENCY: MATCH or MISMATCH
+    (4) If MISMATCH occurs, write REVISION: and fix only the earliest incorrect step, then recompute all three answers using the corrected ledger.
+    (5) After any revision or if all match, output exactly: FINAL: <number>
     
     ORIGINAL: {q}
     
