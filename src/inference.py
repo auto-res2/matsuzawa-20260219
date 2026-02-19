@@ -278,13 +278,29 @@ def run_inference(cfg: DictConfig):
     # Initialize model client
     client = get_openai_client(cfg.run)
     
+    # [VALIDATOR FIX - Attempt 1]
+    # [PROBLEM]: ConfigAttributeError: Key 'inference' is not in struct
+    # [CAUSE]: Inference functions expected cfg to have direct access to inference/model/method keys,
+    #          but the actual structure has these nested under cfg.run due to Hydra defaults loading.
+    # [FIX]: Pass cfg.run instead of cfg to inference functions so they can access inference/model/method directly.
+    #
+    # [OLD CODE]:
+    # Run inference
+    # if cfg.run.method.single_call:
+    #     print("Running single-call inference (IGV-CoT)...")
+    #     results = run_inference_single_call(cfg, examples, client)
+    # else:
+    #     print("Running multi-call inference (Standard CoT)...")
+    #     results = run_inference_multi_call(cfg, examples, client)
+    #
+    # [NEW CODE]:
     # Run inference
     if cfg.run.method.single_call:
         print("Running single-call inference (IGV-CoT)...")
-        results = run_inference_single_call(cfg, examples, client)
+        results = run_inference_single_call(cfg.run, examples, client)
     else:
         print("Running multi-call inference (Standard CoT)...")
-        results = run_inference_multi_call(cfg, examples, client)
+        results = run_inference_multi_call(cfg.run, examples, client)
     
     # Compute metrics
     metrics = compute_metrics(results)
